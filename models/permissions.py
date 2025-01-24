@@ -43,26 +43,25 @@ def assign_department_permissions(employee):
     À appeler lors de la création d'un nouvel employé.
     """
     session = Session()
-    
+
     try:
-        # Récupérer l'employé dans la session courante
+        #Récupérer l'employé de la session courante
         current_employee = session.merge(employee)
+        #Vider les permissions de l'employé
+        current_employee.permissions.clear()
         
-        # Attribution des permissions selon le département
         if current_employee.departement == Employee.COMMERCIAL:
             permission = session.query(Permission).filter_by(code='manage_clients').first()
-            if permission not in current_employee.permissions:
-                current_employee.permissions.append(permission)
+            current_employee.permissions.append(permission)
         
         elif current_employee.departement == Employee.SUPPORT:
             permission = session.query(Permission).filter_by(code='manage_events').first()
-            if permission not in current_employee.permissions:
-                current_employee.permissions.append(permission)
+            current_employee.permissions.append(permission)
         
         elif current_employee.departement == Employee.GESTION:
             manage_users = session.query(Permission).filter_by(code='manage_users').first()
             manage_contracts = session.query(Permission).filter_by(code='manage_contracts').first()
-            current_employee.permissions.extend([p for p in [manage_users, manage_contracts] if p not in current_employee.permissions])
+            current_employee.permissions.extend([manage_users, manage_contracts])
         
         session.commit()
         print(f"Permissions attribuées à {current_employee.prenom} {current_employee.nom}")
