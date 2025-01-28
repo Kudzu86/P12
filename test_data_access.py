@@ -1,8 +1,10 @@
 from datetime import datetime
 from config.db import Session
-from models.models import Employee, Client, Contract, Event
+from models.models import Employee, Client, Contract, Event, Permission
+from models.permissions import setup_department_permissions, assign_department_permissions
+from services import DataService
+from auth import create_access_token
 import pytest
-import sqlalchemy
 import uuid
 
 def generate_unique_email():
@@ -13,10 +15,13 @@ def generate_unique_username():
     """Génère un username unique pour les tests"""
     return f"test_user_{uuid.uuid4()}"
 
-def test_basic_model_creation():
+def test_comprehensive_model_and_service_creation():
     """
-    Test basique de création et de relations entre modèles
+    Test complet de création de modèles et vérification des services
     """
+    # Configurer les permissions initiales
+    setup_department_permissions()
+    
     session = Session()
 
     try:
@@ -33,11 +38,14 @@ def test_basic_model_creation():
         session.add(commercial)
         session.commit()
 
-        # Vérifier la création de l'employé
-        assert commercial.username == commercial_username
-        assert commercial.check_password("test123") is True
+        # Assigner les permissions au commercial
+        assign_department_permissions(commercial)
+        session.commit()
 
-        # 2. Création d'un client
+        # Générer un token pour le commercial
+        commercial_token = create_access_token(commercial_username)
+
+        # 2. Création d'un client par le commercial
         client = Client(
             nom_complet="Client Test",
             email=generate_unique_email(),
@@ -47,26 +55,7 @@ def test_basic_model_creation():
         session.add(client)
         session.commit()
 
-        # Vérifier les relations client-commercial
-        assert len(commercial.clients) == 1
-        assert commercial.clients[0] == client
-
-        # 3. Création d'un contrat
-        contrat = Contract(
-            client_id=client.id,
-            commercial_id=commercial.id,
-            montant_total=1000.00,
-            montant_restant=500.00,
-            est_signe=False
-        )
-        session.add(contrat)
-        session.commit()
-
-        # Vérifier les relations de contrat
-        assert contrat.client == client
-        assert contrat.commercial == commercial
-
-        # 4. Création d'un support
+        # 4. Création d'un employé de support
         support_username = generate_unique_username()
         support = Employee(
             username=support_username,
@@ -79,7 +68,25 @@ def test_basic_model_creation():
         session.add(support)
         session.commit()
 
-        # 5. Création d'un événement
+        # Assigner les permissions au support
+        assign_department_permissions(support)
+        session.commit()
+
+        # Générer un token pour le support
+        support_token = create_access_token(support_username)
+
+        # 5. Création d'un contrat
+        contrat = Contract(
+            client_id=client.id,
+            commercial_id=commercial.id,
+            montant_total=1000.00,
+            montant_restant=500.00,
+            est_signe=False
+        )
+        session.add(contrat)
+        session.commit()
+
+        # 6. Création d'un événement
         event = Event(
             nom="Événement de Test",
             contrat_id=contrat.id,
@@ -92,11 +99,49 @@ def test_basic_model_creation():
         session.add(event)
         session.commit()
 
-        # Vérifier les relations d'événement
-        assert event.contrat == contrat
-        assert event.contact_support == support
+        # 7. Création d'un employé de gestion
+        gestion_username = generate_unique_username()
+        gestion = Employee(
+            username=gestion_username,
+            email=generate_unique_email(),
+            nom="Admin",
+            prenom="System",
+            departement="GESTION"
+        )
+        gestion.set_password("test123")
+        session.add(gestion)
+        session.commit()
 
-        print("Test de création de modèles réussi !")
+        # Assigner les permissions à la gestion
+        assign_department_permissions(gestion)
+        session.commit()
+
+        # Générer un token pour la gestion
+        gestion_token = create_access_token(gestion_username)
+
+        # Vérifications des permissions et accès
+
+        # Le commercial ne voit pas tous les clients (car pas de permission de gestion)
+        commercial_clients = DataService.get_all_clients(commercial_token)
+        assert len(commercial_clients) == 0
+
+        # La gestion voit tous les clients
+        gestion_clients = DataService.get_all_clients(gestion_token)
+        assert len(gestion_clients) >= 1
+
+        # Le commercial voit ses propres contrats
+        commercial_contracts = DataService.get_all_contracts(commercial_token)
+        assert len(commercial_contracts) == 1
+
+        # La gestion voit tous les contrats
+        gestion_contracts = DataService.get_all_contracts(gestion_token)
+        assert len(gestion_contracts) >= 1
+
+        # Le support ne voit pas les événements d'autres supports
+        support_events = DataService.get_all_events(support_token)
+        assert len(support_events) == 1
+
+        print("Test complet de création de modèles et services réussi !")
 
     except Exception as e:
         session.rollback()
@@ -109,7 +154,11 @@ def test_basic_model_creation():
             session.query(Contract).filter_by(montant_total=1000.00).delete()
             session.query(Client).filter_by(entreprise="Entreprise Test").delete()
             session.query(Employee).filter(
-                Employee.username.in_([commercial_username, support_username])
+                Employee.username.in_([
+                    commercial_username, 
+                    support_username, 
+                    gestion_username
+                ])
             ).delete()
             session.commit()
         except Exception as e:

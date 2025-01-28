@@ -10,13 +10,22 @@ class DataService:
         """
         Récupère tous les clients avec vérification de permissions.
         """
+        username = verify_token(token)
+        if not username:
+            return []
+        
         session = Session()
         try:
-            # Vérifier le token et les permissions
-            if not verify_user_permission(token, 'manage_clients'):
-                return []
+            # Récupérer l'utilisateur courant
+            current_user = session.query(Employee).filter_by(username=username).first()
+
+            # Seul le département GESTION peut voir tous les clients
+            if current_user.departement == Employee.GESTION:
+                # IMPORTANT : Vérifier la permission ET le département
+                if verify_user_permission(token, 'manage_clients'):
+                    return session.query(Client).all()
             
-            return session.query(Client).all()
+            return []
         finally:
             session.close()
 

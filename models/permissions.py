@@ -61,7 +61,9 @@ def assign_department_permissions(employee):
         elif current_employee.departement == Employee.GESTION:
             manage_users = session.query(Permission).filter_by(code='manage_users').first()
             manage_contracts = session.query(Permission).filter_by(code='manage_contracts').first()
-            current_employee.permissions.extend([manage_users, manage_contracts])
+            manage_clients = session.query(Permission).filter_by(code='manage_clients').first()
+            manage_events = session.query(Permission).filter_by(code='manage_events').first()            
+            current_employee.permissions.extend([manage_users, manage_clients, manage_events, manage_contracts])
         
         session.commit()
         print(f"Permissions attribuées à {current_employee.prenom} {current_employee.nom}")
