@@ -31,8 +31,25 @@ def verify_token(token: str):
     3. Retourne le username si valide, None sinon
     """
     try:
+        # Décoder le token en utilisant la clé secrète et l'algorithme spécifié
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Récupérer le username à partir du payload
         username = payload.get("sub")
-        return username if username else None
-    except (jwt.ExpiredSignatureError, jwt.JWTError):
+        
+        # Vérifier que le username existe dans la base de données
+        session = Session()
+        try:
+            # Rechercher l'utilisateur pour s'assurer qu'il existe
+            user = session.query(Employee).filter_by(username=username).first()
+            
+            # Retourner le username uniquement si l'utilisateur existe
+            return username if user else None
+        finally:
+            # Toujours fermer la session
+            session.close()
+    
+    except (jwt.ExpiredSignatureError, jwt.PyJWTError) as e:
+        # Gérer les erreurs d'expiration ou de décodage du token
+        # Retourner None en cas d'erreur
         return None
