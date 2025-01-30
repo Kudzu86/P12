@@ -35,7 +35,7 @@ class Employee(Base):
     date_creation = Column(DateTime, default=datetime.utcnow)
 
     # Relations avec les autres tables
-    permissions = relationship('Permission', secondary=employee_permissions, back_populates='employees')
+    permissions = relationship('Permission', secondary=employee_permissions, back_populates='employees', lazy='joined')
     clients = relationship("Client", back_populates="commercial_attitré")
     contrats = relationship("Contract", back_populates="commercial")
     evenements = relationship("Event", back_populates="contact_support")

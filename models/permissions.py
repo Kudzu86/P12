@@ -78,27 +78,16 @@ def assign_department_permissions(employee):
 
 def verify_user_permission(token: str, required_permission: str):
     # 1. Vérifier la validité du token
-    username = verify_token(token)
+    employee = verify_token(token)
     # Si le token est invalide (None ou expiré), retourne False
-    if not username:
+    if not employee:
         return False
-    
-    # 2. Ouvrir une session de base de données
-    session = Session()
-    
-    try:
-        # 3. Rechercher l'employé correspondant au username
-        employee = session.query(Employee).filter_by(username=username).first()
         
-        # 4. Parcourir les permissions de l'employé
-        for permission in employee.permissions:
-            # 5. Vérifier si l'une des permissions correspond à la permission requise
-            if permission.code == required_permission:
-                return True
-        
-        # 6. Si aucune permission ne correspond, retourne False
-        return False
-
-    finally:
-        # 7. Toujours fermer la session
-        session.close()
+    # 4. Parcourir les permissions de l'employé
+    for permission in employee.permissions:
+        # 5. Vérifier si l'une des permissions correspond à la permission requise
+        if permission.code == required_permission:
+            return True
+    
+    # 6. Si aucune permission ne correspond, retourne False
+    return False

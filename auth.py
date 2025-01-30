@@ -28,7 +28,7 @@ def verify_token(token: str):
     """
     1. Décode le token avec la clé secrète
     2. Vérifie que le token n'est pas expiré
-    3. Retourne le username si valide, None sinon
+    3. Retourne le user si valide, None sinon
     """
     try:
         # Décoder le token en utilisant la clé secrète et l'algorithme spécifié
@@ -41,10 +41,10 @@ def verify_token(token: str):
         session = Session()
         try:
             # Rechercher l'utilisateur pour s'assurer qu'il existe
-            user = session.query(Employee).filter_by(username=username).first()
+            employee = session.query(Employee).filter_by(username=username).first()
             
             # Retourner le username uniquement si l'utilisateur existe
-            return username if user else None
+            return employee
         finally:
             # Toujours fermer la session
             session.close()
