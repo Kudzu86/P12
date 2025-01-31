@@ -2,25 +2,24 @@ from config.db import Session
 from models.models import Permission, Employee
 from auth import verify_token
 
-
 def setup_department_permissions():
-    """
-    Configure les permissions initiales pour chaque département.
-    Cette fonction doit être exécutée une seule fois à l'initialisation de la BDD.
-    """
-    # Création d'une session pour interagir avec la BDD
+    """Configure les permissions initiales pour chaque département"""
     session = Session()
     
     try:
-        # Définition des permissions de base
+        # Permissions de base
         permissions = {
             'manage_users': 'Gestion collaborateurs',
+            'delete_users': 'Suppression collaborateurs',
             'manage_contracts': 'Gestion des contrats',
             'manage_clients': 'Gestion des clients',
-            'manage_events': 'Gestion des évènements'
+            'manage_events': 'Gestion des événements',
+            'read_clients': 'Lecture des clients',
+            'read_contracts': 'Lecture des contrats',
+            'read_events': 'Lecture des événements'
         }
 
-        # Création des permissions dans la BDD si elles n'existent pas déjà
+        # Création des permissions
         for code, description in permissions.items():
             if not session.query(Permission).filter_by(code=code).first():
                 permission = Permission(code=code, description=description)
@@ -32,24 +31,24 @@ def setup_department_permissions():
     except Exception as e:
         print(f"Erreur lors de la configuration des permissions : {e}")
         session.rollback()
-    
     finally:
         session.close()
 
-
 def assign_department_permissions(employee):
-    """
-    Attribue les permissions à un employé selon son département.
-    À appeler lors de la création d'un nouvel employé.
-    """
+    """Attribue les permissions selon le département"""
     session = Session()
 
     try:
-        #Récupérer l'employé de la session courante
         current_employee = session.merge(employee)
-        #Vider les permissions de l'employé
         current_employee.permissions.clear()
         
+        # Permissions de lecture par défaut pour tous
+        read_permissions = ['read_clients', 'read_contracts', 'read_events']
+        for perm in read_permissions:
+            permission = session.query(Permission).filter_by(code=perm).first()
+            current_employee.permissions.append(permission)
+
+        # Permissions spécifiques par département
         if current_employee.departement == Employee.COMMERCIAL:
             permission = session.query(Permission).filter_by(code='manage_clients').first()
             current_employee.permissions.append(permission)
@@ -59,11 +58,13 @@ def assign_department_permissions(employee):
             current_employee.permissions.append(permission)
         
         elif current_employee.departement == Employee.GESTION:
-            manage_users = session.query(Permission).filter_by(code='manage_users').first()
-            manage_contracts = session.query(Permission).filter_by(code='manage_contracts').first()
-            manage_clients = session.query(Permission).filter_by(code='manage_clients').first()
-            manage_events = session.query(Permission).filter_by(code='manage_events').first()            
-            current_employee.permissions.extend([manage_users, manage_clients, manage_events, manage_contracts])
+            permissions = [
+                'manage_users', 'delete_users',  # Ajout de delete_users
+                'manage_contracts', 'manage_clients', 'manage_events'
+            ]
+            for perm_code in permissions:
+                permission = session.query(Permission).filter_by(code=perm_code).first()
+                current_employee.permissions.append(permission)
         
         session.commit()
         print(f"Permissions attribuées à {current_employee.prenom} {current_employee.nom}")
@@ -71,23 +72,22 @@ def assign_department_permissions(employee):
     except Exception as e:
         print(f"Erreur lors de l'attribution des permissions : {e}")
         session.rollback()
-    
     finally:
         session.close()
 
-
 def verify_user_permission(token: str, required_permission: str):
-    # 1. Vérifier la validité du token
+    """Vérifie si l'utilisateur a la permission requise"""
     employee = verify_token(token)
-    # Si le token est invalide (None ou expiré), retourne False
     if not employee:
         return False
         
-    # 4. Parcourir les permissions de l'employé
+    # Autoriser la lecture pour tous
+    if required_permission.startswith('read_'):
+        return True
+
+    # Vérifier les autres permissions
     for permission in employee.permissions:
-        # 5. Vérifier si l'une des permissions correspond à la permission requise
         if permission.code == required_permission:
             return True
     
-    # 6. Si aucune permission ne correspond, retourne False
     return False

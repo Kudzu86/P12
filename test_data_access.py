@@ -2,33 +2,50 @@ from datetime import datetime
 from config.db import Session
 from models.models import Employee, Client, Contract, Event, Permission
 from models.permissions import setup_department_permissions, assign_department_permissions
-from services import DataService
+from crud.read import ReadService
 from auth import create_access_token
+from sqlalchemy import text
 import pytest
 import uuid
 
+
 def generate_unique_email():
-    """Génère un email unique pour les tests"""
     return f"test_{uuid.uuid4()}@example.com"
 
+
 def generate_unique_username():
-    """Génère un username unique pour les tests"""
     return f"test_user_{uuid.uuid4()}"
 
-def test_comprehensive_model_and_service_creation():
-    """
-    Test complet de création de modèles et vérification des services
-    """
-    # Configurer les permissions initiales
-    setup_department_permissions()
-    
+
+def clean_database(session):
+    """Nettoie la base de données dans le bon ordre"""
+    try:
+        session.query(Event).delete()
+        session.query(Contract).delete()
+        session.query(Client).delete()
+        session.execute(text('DELETE FROM employee_permissions'))
+        session.query(Employee).delete()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+
+@pytest.fixture(scope="function")
+def setup_test_data():
+    """Fixture pour configurer les données de test"""
     session = Session()
+    
+    # Nettoyage initial
+    clean_database(session)
+    
+    # Configuration initiale des permissions
+    setup_department_permissions()
 
     try:
-        # 1. Création d'un employé commercial
-        commercial_username = generate_unique_username()
+        # 1. Création du commercial
         commercial = Employee(
-            username=commercial_username,
+            username=generate_unique_username(),
             email=generate_unique_email(),
             nom="Dupont",
             prenom="Jean",
@@ -37,15 +54,35 @@ def test_comprehensive_model_and_service_creation():
         commercial.set_password("test123")
         session.add(commercial)
         session.commit()
-
-        # Assigner les permissions au commercial
         assign_department_permissions(commercial)
+
+        # 2. Création du support
+        support = Employee(
+            username=generate_unique_username(),
+            email=generate_unique_email(),
+            nom="Martin",
+            prenom="Sophie",
+            departement="SUPPORT"
+        )
+        support.set_password("test123")
+        session.add(support)
         session.commit()
+        assign_department_permissions(support)
 
-        # Générer un token pour le commercial
-        commercial_token = create_access_token(commercial_username)
+        # 3. Création de la gestion
+        gestion = Employee(
+            username=generate_unique_username(),
+            email=generate_unique_email(),
+            nom="Admin",
+            prenom="System",
+            departement="GESTION"
+        )
+        gestion.set_password("test123")
+        session.add(gestion)
+        session.commit()
+        assign_department_permissions(gestion)
 
-        # 2. Création d'un client par le commercial
+        # 4. Création du client
         client = Client(
             nom_complet="Client Test",
             email=generate_unique_email(),
@@ -55,27 +92,7 @@ def test_comprehensive_model_and_service_creation():
         session.add(client)
         session.commit()
 
-        # 4. Création d'un employé de support
-        support_username = generate_unique_username()
-        support = Employee(
-            username=support_username,
-            email=generate_unique_email(),
-            nom="Martin",
-            prenom="Sophie",
-            departement="SUPPORT"
-        )
-        support.set_password("test123")
-        session.add(support)
-        session.commit()
-
-        # Assigner les permissions au support
-        assign_department_permissions(support)
-        session.commit()
-
-        # Générer un token pour le support
-        support_token = create_access_token(support_username)
-
-        # 5. Création d'un contrat
+        # 5. Création du contrat
         contrat = Contract(
             client_id=client.id,
             commercial_id=commercial.id,
@@ -86,7 +103,7 @@ def test_comprehensive_model_and_service_creation():
         session.add(contrat)
         session.commit()
 
-        # 6. Création d'un événement
+        # 6. Création de l'événement
         event = Event(
             nom="Événement de Test",
             contrat_id=contrat.id,
@@ -99,69 +116,79 @@ def test_comprehensive_model_and_service_creation():
         session.add(event)
         session.commit()
 
-        # 7. Création d'un employé de gestion
-        gestion_username = generate_unique_username()
-        gestion = Employee(
-            username=gestion_username,
-            email=generate_unique_email(),
-            nom="Admin",
-            prenom="System",
-            departement="GESTION"
-        )
-        gestion.set_password("test123")
-        session.add(gestion)
-        session.commit()
+        # Création des tokens
+        tokens = {
+            'commercial': create_access_token(commercial.username),
+            'support': create_access_token(support.username),
+            'gestion': create_access_token(gestion.username)
+        }
 
-        # Assigner les permissions à la gestion
-        assign_department_permissions(gestion)
-        session.commit()
+        test_data = {
+            'tokens': tokens,
+            'employees': {'commercial': commercial, 'support': support, 'gestion': gestion},
+            'client': client,
+            'contrat': contrat,
+            'event': event
+        }
 
-        # Générer un token pour la gestion
-        gestion_token = create_access_token(gestion_username)
+        yield test_data
 
-        # Vérifications des permissions et accès
-
-        # Le commercial ne voit pas tous les clients (car pas de permission de gestion)
-        commercial_clients = DataService.get_all_clients(commercial_token)
-        assert len(commercial_clients) == 0
-
-        # La gestion voit tous les clients
-        gestion_clients = DataService.get_all_clients(gestion_token)
-        assert len(gestion_clients) >= 1
-
-        # Le commercial voit ses propres contrats
-        commercial_contracts = DataService.get_all_contracts(commercial_token)
-        assert len(commercial_contracts) == 1
-
-        # La gestion voit tous les contrats
-        gestion_contracts = DataService.get_all_contracts(gestion_token)
-        assert len(gestion_contracts) >= 1
-
-        # Le support ne voit pas les événements d'autres supports
-        support_events = DataService.get_all_events(support_token)
-        assert len(support_events) == 1
-
-        print("Test complet de création de modèles et services réussi !")
-
-    except Exception as e:
+    except Exception:
         session.rollback()
         raise
 
     finally:
-        # Nettoyage
-        try:
-            session.query(Event).filter_by(nom="Événement de Test").delete()
-            session.query(Contract).filter_by(montant_total=1000.00).delete()
-            session.query(Client).filter_by(entreprise="Entreprise Test").delete()
-            session.query(Employee).filter(
-                Employee.username.in_([
-                    commercial_username, 
-                    support_username, 
-                    gestion_username
-                ])
-            ).delete()
-            session.commit()
-        except Exception as e:
-            session.rollback()
-        finally:
-            session.close()
+        clean_database(session)
+        session.close()
+
+
+@pytest.fixture(autouse=True)
+def session():
+    """Fixture pour gérer la session de base de données"""
+    session = Session()
+    yield session
+    session.close()
+
+
+def test_commercial_access(setup_test_data, session):
+    """Test des accès du commercial"""
+    tokens = setup_test_data['tokens']
+    
+    # Test accès aux clients
+    commercial_clients = ReadService.get_all_clients(tokens['commercial'])
+    assert len(commercial_clients) == 1
+    assert commercial_clients[0].nom_complet == "Client Test"
+
+    # Test accès aux contrats
+    commercial_contracts = ReadService.get_all_contracts(tokens['commercial'])
+    assert len(commercial_contracts) == 1
+    assert commercial_contracts[0].montant_total == 1000.00
+
+
+def test_support_access(setup_test_data, session):
+    """Test des accès du support"""
+    tokens = setup_test_data['tokens']
+    
+    # Test accès aux événements
+    support_events = ReadService.get_all_events(tokens['support'])
+    assert len(support_events) == 1
+    assert support_events[0].nom == "Événement de Test"
+
+    # Test accès aux clients (ne devrait pas en voir)
+    support_clients = ReadService.get_all_clients(tokens['support'])
+    assert len(support_clients) == 0
+
+
+def test_gestion_access(setup_test_data, session):
+    """Test des accès de la gestion"""
+    tokens = setup_test_data['tokens']
+    
+    # Test accès à toutes les données
+    gestion_clients = ReadService.get_all_clients(tokens['gestion'])
+    assert len(gestion_clients) == 1
+
+    gestion_contracts = ReadService.get_all_contracts(tokens['gestion'])
+    assert len(gestion_contracts) == 1
+
+    gestion_events = ReadService.get_all_events(tokens['gestion'])
+    assert len(gestion_events) == 1

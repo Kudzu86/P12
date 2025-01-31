@@ -1,7 +1,9 @@
 import pytest
 from config.db import Session
 from models.models import Employee, Client, Contract, Event
-from crud import CRUDService
+from crud.create import CreateService
+from crud.read import ReadService
+from crud.update import UpdateService
 from auth import create_access_token
 from models.permissions import setup_department_permissions, assign_department_permissions
 import uuid
@@ -73,7 +75,7 @@ def test_create_employee(test_tokens):
    }
 
    # Test avec token ayant tous les droits
-   employee = CRUDService.create_employee(
+   employee = CreateService.create_employee(
        test_tokens['all_rights'], 
        employee_data
    )
@@ -82,7 +84,7 @@ def test_create_employee(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.create_employee(
+       CreateService.create_employee(
            test_tokens['limited_rights'], 
            employee_data
        )
@@ -115,7 +117,7 @@ def test_update_employee(test_tokens):
    }
    
    # Test avec token ayant tous les droits
-   updated_employee = CRUDService.update_employee(
+   updated_employee = UpdateService.update_employee(
        test_tokens['all_rights'], 
        employee_id, 
        update_data
@@ -125,7 +127,7 @@ def test_update_employee(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.update_employee(
+       UpdateService.update_employee(
            test_tokens['limited_rights'], 
            employee_id, 
            update_data
@@ -156,7 +158,7 @@ def test_create_contract(test_tokens):
    }
 
    # Test avec token ayant tous les droits
-   contract = CRUDService.create_contract(
+   contract = CreateService.create_contract(
        test_tokens['all_rights'], 
        contract_data
    )
@@ -165,7 +167,7 @@ def test_create_contract(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.create_contract(
+       CreateService.create_contract(
            test_tokens['limited_rights'], 
            contract_data
        )
@@ -202,7 +204,7 @@ def test_update_contract(test_tokens):
    }
    
    # Test avec token ayant tous les droits
-   updated_contract = CRUDService.update_contract(
+   updated_contract = UpdateService.update_contract(
        test_tokens['all_rights'], 
        contract_id, 
        update_data
@@ -212,7 +214,7 @@ def test_update_contract(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.update_contract(
+       UpdateService.update_contract(
            test_tokens['limited_rights'], 
            contract_id, 
            update_data
@@ -254,7 +256,7 @@ def test_create_event(test_tokens):
    }
 
    # Test avec token ayant tous les droits
-   event = CRUDService.create_event(
+   event = CreateService.create_event(
        test_tokens['all_rights'], 
        event_data
    )
@@ -263,7 +265,7 @@ def test_create_event(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.create_event(
+       CreateService.create_event(
            test_tokens['limited_rights'], 
            event_data
        )
@@ -312,7 +314,7 @@ def test_update_event(test_tokens):
    }
    
    # Test avec token ayant tous les droits
-   updated_event = CRUDService.update_event(
+   updated_event = UpdateService.update_event(
        test_tokens['all_rights'], 
        event_id, 
        update_data
@@ -323,7 +325,7 @@ def test_update_event(test_tokens):
 
    # Test avec token aux droits limités
    with pytest.raises(PermissionError):
-       CRUDService.update_event(
+        UpdateService.update_event(
            test_tokens['limited_rights'], 
            event_id, 
            update_data
