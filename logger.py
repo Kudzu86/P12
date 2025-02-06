@@ -3,6 +3,7 @@ from sentry_sdk import capture_exception, capture_message
 import os
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 def init_sentry():

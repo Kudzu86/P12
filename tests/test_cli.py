@@ -27,7 +27,8 @@ def setup():
     session.query(Contract).delete()
     session.query(Client).delete()
     session.execute(text('DELETE FROM employee_permissions'))
-    session.query(Employee).delete()
+    # Supprimer les employés créés pour les tests (en particulier les `test_user_*`)
+    session.query(Employee).filter(Employee.username.like("test_user_%")).delete()
     session.commit()
     session.close()
 
@@ -291,16 +292,14 @@ def test_read_access_all():
             assert result.exit_code == 0
 
 def test_delete_employee(admin_user):
-    """Test que le gestionnaire peut supprimer un collaborateur"""
+    """Test que le gestionnaire peut supprimer un collaborateur spécifique"""
     session = Session()
-    username = generate_unique_username()
-    email = generate_unique_email()
-    
-    # Créer un collaborateur
+
+    # Créer un employé uniquement pour ce test
     employee = Employee(
-        username=username,
-        email=email,
-        nom="Test Collaborateur",
+        username="test_delete_user",
+        email="delete_user@example.com",
+        nom="Delete",
         prenom="User",
         departement="COMMERCIAL"
     )
@@ -309,17 +308,22 @@ def test_delete_employee(admin_user):
     session.commit()
 
     # Récupérer l'ID de l'employé nouvellement créé
-    employee_id = session.query(Employee).filter_by(username=username).first().id
+    employee_id = session.query(Employee).filter_by(username="test_delete_user").first().id
     session.close()
 
-    # Vérifier qu'il est bien créé
+    # Vérifier que l'employé est bien créé (avant suppression)
     result = admin_user.invoke(cli, ['employees', 'list'])
-    assert username in result.output
+    assert "test_delete_user" in result.output
 
-    # Supprimer l'employé
+    # Supprimer l'employé créé pour ce test
     result = admin_user.invoke(cli, ['employees', 'delete', str(employee_id)])
+
+    # Vérifier que l'employé a été supprimé
     assert "Collaborateur supprimé avec succès" in result.output
 
-    # Vérifier qu'il a été supprimé
+    # Vérifier que l'employé n'est plus dans la liste
     result = admin_user.invoke(cli, ['employees', 'list'])
-    assert username not in result.output
+    assert "test_delete_user" not in result.output
+
+    # Re-vérifier que les autres employés n'ont pas été supprimés
+    result = admin_user.invoke(cli, ['employees', 'list'])

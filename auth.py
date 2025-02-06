@@ -12,13 +12,7 @@ ALGORITHM = "HS256"  # Algorithme de hashage pour JWT
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Durée de validité du token
 
 def create_access_token(username: str):
-    """
-    1. Crée un dictionnaire avec :
-       - 'sub' : identifiant utilisateur (username)
-       - 'exp' : date d'expiration (maintenant + 30 min)
-    2. Encode ce dictionnaire en JWT
-    3. Retourne le token encodé
-    """
+
     expires = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode = {"sub": username, "exp": expires}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
