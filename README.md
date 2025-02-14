@@ -12,7 +12,7 @@ Cette application permet :
 - Gestion des clients et des contrats
 - Gestion des événements
 - Gestion des collaborateurs avec différents rôles (Commercial, Support, Gestion)
-- Sécurisation des accès selon les rôles
+- Sécurisation des accès et filtres selon les rôles
 - Suivi des erreurs avec Sentry
 
 ## Prérequis
@@ -46,15 +46,7 @@ env\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-### 4. Ouvrir un second terminal
-
-Ouvrez un second terminal pour ouvrir la base de données d'un coté et rentrer les commandes python de l'autre.
-Entrer dans l'environnement virtuel dans ce terminal également :
-```bash
-source env/bin/activate  # Linux/Mac
-env\Scripts\activate     # Windows
-```
-### 5. Configurer la base de données
+### 4. Configuration
 
 
 1. Installer PostgreSQL sur votre machine si ce n'est pas déjà fait
@@ -62,9 +54,16 @@ env\Scripts\activate     # Windows
    - Linux : `sudo apt-get install postgresql`
    - Mac : `brew install postgresql`
 
-2. Se connecter à PostgreSQL et créer la base de données :
+2. Créer un fichier .env à la racine du projet :
 ```bash
-psql -U postgres -d epic_events_crm
+DB_ENGINE=postgresql
+DB_NAME=epic_events_crm
+DB_USER=admin
+DB_PASSWORD=secure_password
+DB_HOST=localhost
+DB_PORT=5432
+JWT_SECRET_KEY=une_clé_secrète_longue_et_aléatoire
+SENTRY_DSN=votre_dsn_sentry  # À récupérer sur Sentry.io
 ```
 
 3. Initialiser la base de données
@@ -72,31 +71,15 @@ psql -U postgres -d epic_events_crm
 python init_db.py
 ```
 
-4. Créer un premier utilisateur administrateur :
-```bash
-python manage.py create_admin
-```
-Cela créera un utilisateur par défaut avec les identifiants suivants :
+4. Identifiants
 
-**Username : test_admin**
-**Password : admin123**
+Vous pourrez vous connecter en tant qu'admin avec les identifiants suivants :
+
+**Username : admin**
+**Password : admin**
 
 Il est recommandé de changer le mot de passe après la première connexion.
 
-### 6. Configuration
-
-Créer un fichier .env à la racine du projet :
-
-```bash
-DB_ENGINE=postgresql
-DB_NAME=epic_events_crm
-DB_USER=admin           # L'utilisateur créé à l'étape précédente
-DB_PASSWORD=secure_password  # Le mot de passe choisi à l'étape précédente
-DB_HOST=localhost
-DB_PORT=5432
-JWT_SECRET_KEY=une_clé_secrète_longue_et_aléatoire
-SENTRY_DSN=votre_dsn_sentry  # À récupérer sur Sentry.io
-```
 
 
 ## Dépendances principales
@@ -132,9 +115,9 @@ P12/
 └── requirements.txt
 
 
+
 ## Utilisation
 
-**ATTENTION :** Ces commandes doivent être exécutées dans le terminal Python, et non dans celui de PostgreSQL (psql) !
 
 ### Authentification
 
@@ -146,6 +129,43 @@ python cli.py auth login
 python cli.py auth logout
 ```
 
+### Utiliser --help
+
+
+EXEMPLE :
+
+```bash
+# Listez les différents choix de mise à jour pour un client
+python cli.py clients update --help                     
+```
+
+Vous aurez alors affiché :
+
+```bash
+Connexion réussie à la base de données !
+Usage: cli.py clients update [OPTIONS] CLIENT_ID
+
+  Met à jour un client existant
+
+Options:
+  --nom TEXT         Nouveau nom complet
+  --email TEXT       Nouvel email
+  --entreprise TEXT  Nouvelle entreprise
+  --telephone TEXT   Nouveau téléphone
+  --help             Show this message and exit.
+```
+
+Vous pourrez donc modifier facilement les informations du clients en faisant :
+
+```bash
+# Modification du mail du client
+python cli.py clients update <client_id> --email exempleemail@exemple.com
+
+# ou modifier son numéro de téléphone
+python cli.py clients update <client_id> --telephone 0614487421
+```
+
+
 ### Gestion des clients
 
 ```bash
@@ -155,34 +175,44 @@ python cli.py clients list
 # Ajouter un client
 python cli.py clients add
 
-# Mettre à jour un client
-python cli.py clients update <client_id>
+# Mettre à jour le nom d'un client
+python cli.py clients update <client_id> --nom "Nouveau Nom"
 ```
 
 ### Gestion des contrats
 
 ```bash
-# Lister les contrats
-python cli.py contracts list
+# Lister les contrats (avec filtres selon le rôle)
+python cli.py contracts list                         # Liste complète
+python cli.py contracts list --filter with_support   # Contrats avec support (Gestion)
+python cli.py contracts list --filter without_support # Contrats sans support (Gestion)
+python cli.py contracts list --filter signed         # Contrats signés (Commercial)
+python cli.py contracts list --filter unsigned       # Contrats non signés (Commercial)
+python cli.py contracts list --filter fully_paid     # Contrats payés (Commercial)
+python cli.py contracts list --filter not_fully_paid # Contrats non payés (Commercial)
 
-# Ajouter un contrat
+# Ajouter un contrat (Gestion uniquement)
 python cli.py contracts add
 
 # Mettre à jour un contrat
-python cli.py contracts update <contract_id>
+python cli.py contracts update <contract_id> --montant-total <montant> --montant-restant <montant> --est-signe <true/false>
 ```
 
 ### Gestion des évenements
 
 ```bash
-# Lister les événements
-python cli.py events list
+# Lister les événements (avec filtres pour le support)
+python cli.py events list                    # Liste complète
+python cli.py events list --filter my_events # Mes événements (Support)
 
-# Ajouter un événement
+# Ajouter un événement (Commercial pour contrats signés)
 python cli.py events add
 
 # Mettre à jour un événement
-python cli.py events update <event_id>
+python cli.py events update <event_id> --nom "Nom" --lieu "Lieu" --date-debut "2024-12-01 14:00" --date-fin "2024-12-01 18:00"
+
+# Assigner un support (Gestion uniquement)
+python cli.py events update <event_id> --contact-support-id <support_id>
 ```
 
 ### Gestion des collaborateurs (Admin)
@@ -190,6 +220,12 @@ python cli.py events update <event_id>
 ```bash
 # Lister les collaborateurs
 python cli.py employees list
+
+# Ajouter un collaborateur
+python cli.py employees add
+
+# Mettre à jour le departement d'un collaborateur
+python cli.py employees update <employee_id> --departement support
 
 # Supprimer un collaborateur
 python cli.py employees delete <employee_id>
@@ -199,14 +235,16 @@ python cli.py employees delete <employee_id>
 
 ### Département Commercial
 
+- Lecture complète des clients/contrats/événements
 - Création et mise à jour de leurs clients
-- Création d'événements pour leurs clients
-- Lecture de tous les contrats/événements
+- Création d'événements pour leurs contrats signés
+- Filtres spéciaux pour les contrats
 
 ### Département Support
 
-- Mise à jour des événements qui leur sont assignés
 - Lecture de tous les clients/contrats/événements
+- Mise à jour des événements qui leur sont assignés
+- Filtre pour voir leurs événements
 
 ### Département Gestion
 
@@ -214,6 +252,7 @@ python cli.py employees delete <employee_id>
 - Gestion complète des contrats
 - Assignation des événements aux supports
 - Lecture et modification de toutes les données
+- Filtres spéciaux pour les contrats
 
 
 ## Configuration Sentry
@@ -253,7 +292,25 @@ pytest -v tests/test_cli.py       # Tests interface CLI
 
 ## Modèles de données
 
-### Client
+### Employees
+
+- Username (unique)
+- Mot de passe (hashé)
+- Numéro employé (unique, optionnel)
+- Email (unique)
+- Nom
+- Prénom
+- Téléphone (optionnel)
+- Département (COMMERCIAL, SUPPORT, GESTION)
+- Date de création
+- Permissions associées
+- Relations avec :
+      Clients (pour les commerciaux)
+      Contrats (pour les commerciaux)
+      Événements (pour les supports)
+
+
+### Clients
 
 - Nom complet
 - Email
@@ -262,8 +319,11 @@ pytest -v tests/test_cli.py       # Tests interface CLI
 - Commercial attitré
 - Date de création
 - Dernière mise à jour
+- Relations avec :
+      Commercial attitré
+      Contrats associés
 
-### Contrat
+### Contrats
 
 - Client
 - Commercial
@@ -271,8 +331,12 @@ pytest -v tests/test_cli.py       # Tests interface CLI
 - Montant restant
 - Date de création
 - Statut de signature
+- Relations avec :
+      Client
+      Commercial
+      Évènement associé
 
-### Événement
+### Events
 
 - Nom
 - Contrat associé
@@ -281,6 +345,9 @@ pytest -v tests/test_cli.py       # Tests interface CLI
 - Lieu
 - Nombre de participants
 - Notes
+- Relations avec :
+      Contrat
+      Support assigné
 
 
 ## Sécurité
@@ -288,8 +355,10 @@ pytest -v tests/test_cli.py       # Tests interface CLI
 ### Mesures de sécurité
 
 - Authentification JWT
+- Mots de passe hashés avec bcrypt
 - Système de permissions basé sur les rôles
 - Variables d'environnement pour les secrets
+- Gestion des sessions SQLAlchemy
 
 
 ## Licence

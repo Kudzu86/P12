@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk import capture_exception, capture_message
+from sentry_sdk import capture_exception, capture_message, flush
 import os
 from dotenv import load_dotenv
 

@@ -39,6 +39,15 @@ class Employee(Base):
    contrats = relationship("Contract", back_populates="commercial")
    evenements = relationship("Event", back_populates="contact_support")
 
+   def __init__(self, *args, **kwargs):
+       """Initialise l'employé et hash le mot de passe si fourni"""
+       if 'password' in kwargs:
+           password = kwargs.pop('password')
+           super().__init__(*args, **kwargs)
+           self.set_password(password)
+       else:
+           super().__init__(*args, **kwargs)
+
    def set_password(self, password):
        """Hash le mot de passe avant de le stocker"""
        password_bytes = password.encode('utf-8')
