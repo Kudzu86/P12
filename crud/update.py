@@ -117,12 +117,12 @@ class UpdateService:
             if not event:
                 raise NoResultFound("Événement non trouvé")
 
-            # Vérifier les permissions
-            if not (
-                (current_user.departement == Employee.GESTION and verify_user_permission(token, 'manage_events')) or
-                (current_user.departement == Employee.SUPPORT and event.contact_support_id == current_user.id)
-            ):
-                raise PermissionError("Vous n'avez pas la permission de modifier cet événement")
+            # Si on essaie d'assigner un support
+            if 'contact_support_id' in update_data:
+                # Vérifier que l'utilisateur est bien du département SUPPORT
+                potential_support = session.query(Employee).get(update_data['contact_support_id'])
+                if not potential_support or potential_support.departement != Employee.SUPPORT:
+                    raise PermissionError("Le contact support doit être du département SUPPORT")
 
             for key, value in update_data.items():
                 setattr(event, key, value)

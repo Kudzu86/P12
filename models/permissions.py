@@ -59,7 +59,7 @@ def assign_department_permissions(employee):
         
         elif current_employee.departement == Employee.GESTION:
             permissions = [
-                'manage_users', 'delete_users',  # Ajout de delete_users
+                'manage_users', 'delete_users',
                 'manage_contracts', 'manage_clients', 'manage_events'
             ]
             for perm_code in permissions:
